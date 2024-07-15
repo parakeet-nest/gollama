@@ -10,15 +10,6 @@ Todo:
 Remark: delete tag: git tag -d v0.0.1
 COMMENT
 
-read -r -d '' GOLLAMA_MAIN <<- EOM
-package parakeet
-
-var Version = "${TAG}"
-var About = "${ABOUT}"
-EOM
-
-echo "${GOLLAMA_MAIN}" > parakeet.go
-
 echo "Generating release: ${TAG} ${ABOUT}"
 
 find . -name '.DS_Store' -type f -delete
