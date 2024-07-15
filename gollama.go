@@ -15,7 +15,7 @@ type Message struct {
 }
 
 type Answer struct {
-	Model   string  `json:"model"` // 🤔
+	//Model   string  `json:"model"` // 🤔
 	Message Message `json:"message"`
 	Done    bool    `json:"done"`
 }
@@ -122,8 +122,6 @@ func ChatStream(url string, query Query, onChunk func(Answer) error) (Answer, er
 			onChunk(Answer{})
 		}
 		fullAnswer.Message.Content += answer.Message.Content
-
-		// ? 🤔 and if I used answer + error as a parameter?
 		err = onChunk(answer)
 
 		// generate an error to stop the stream
