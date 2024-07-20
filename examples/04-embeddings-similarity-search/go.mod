@@ -1,4 +1,4 @@
-module 03-create-embedding
+module 04-embeddings-similarity-search
 
 go 1.22.1
 

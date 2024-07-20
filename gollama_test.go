@@ -1,9 +1,11 @@
 package gollama
 
 import (
+	"errors"
 	"fmt"
 	"log"
 	"strconv"
+	"strings"
 	"testing"
 )
 
@@ -153,4 +155,39 @@ func TestSimilaritySearch(t *testing.T) {
 		log.Println("🙂", similarities)
 	}
 
+}
+
+func TestJAccardSimilarity(t *testing.T) {
+	userContent := `Who is Jean-Luc Picard?`
+
+	splittedUserContent := strings.Fields(userContent)
+
+	type similarity struct {
+		coeff float64
+		doc   string
+	}
+
+	similarities := []similarity{}
+
+	// Calculate Jaccard index for every document
+	// the highest index is related to the best similarity
+	for idx, doc := range docs {
+		jaccardIndex := JaccardSimilarityCoeff(splittedUserContent, strings.Fields(doc))
+		fmt.Println("- 📝", idx, "Jaccard index:", jaccardIndex)
+
+		similarity := similarity{
+			coeff: jaccardIndex,
+			doc:   docs[idx],
+		}
+
+		if jaccardIndex > 0.03 {
+			similarities = append(similarities, similarity)
+		}
+
+	}
+	if len(similarities) == 0 {
+		t.Fatal("😡 no similarity:", errors.New("no similarity"))
+	} else {
+		log.Println("🙂 Similarities:", similarities)
+	}
 }
