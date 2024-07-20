@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"io"
+	"math"
 	"net/http"
 )
 
@@ -15,7 +16,7 @@ type Message struct {
 }
 
 type Answer struct {
-	//Model   string  `json:"model"` // 🤔
+	//Model   string  `json:"model"`
 	Message Message `json:"message"`
 	Done    bool    `json:"done"`
 }
@@ -54,6 +55,129 @@ type Query struct {
 	//Template  string `json:"template,omitempty"`
 }
 
+// === Cosine distance ===
+func dotProduct(v1 []float64, v2 []float64) float64 {
+	// Calculate the dot product of two vectors
+	sum := 0.0
+	for i := range v1 {
+		sum += v1[i] * v2[i]
+	}
+	return sum
+}
+
+func CosineDistance(v1, v2 []float64) float64 {
+	// Calculate the cosine distance between two vectors
+	product := dotProduct(v1, v2)
+	norm1 := math.Sqrt(dotProduct(v1, v1))
+	norm2 := math.Sqrt(dotProduct(v2, v2))
+	if norm1 <= 0.0 || norm2 <= 0.0 {
+		// Handle potential division by zero
+		return 0.0
+	}
+	return product / (norm1 * norm2)
+}
+
+// === Embeddings ===
+type VectorRecord struct {
+	Id        string    `json:"id"`
+	Prompt    string    `json:"prompt"`
+	Embedding []float64 `json:"embedding"`
+}
+
+// https://github.com/ollama/ollama/blob/main/docs/api.md#request-22
+type Query4Embedding struct {
+	Prompt string `json:"prompt"`
+	Model  string `json:"model"`
+}
+
+type EmbeddingResponse struct {
+	Embedding []float64 `json:"embedding"`
+}
+
+// Create embedding
+func CreateEmbedding(ollamaUrl string, query Query4Embedding, id string) (VectorRecord, error) {
+	jsonData, err := json.Marshal(query)
+	if err != nil {
+		return VectorRecord{}, err
+	}
+
+	resp, err := http.Post(ollamaUrl+"/api/embeddings", "application/json; charset=utf-8", bytes.NewBuffer(jsonData))
+	if err != nil {
+		return VectorRecord{}, err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return VectorRecord{}, errors.New("Error: status code: " + resp.Status)
+	}
+	body, err := io.ReadAll(resp.Body)
+
+	if err != nil {
+		return VectorRecord{}, err
+	}
+
+	var answer EmbeddingResponse
+	err = json.Unmarshal([]byte(string(body)), &answer)
+	if err != nil {
+		return VectorRecord{}, err
+	}
+
+	vectorRecord := VectorRecord{
+		Prompt:    query.Prompt,
+		Embedding: answer.Embedding,
+		Id:        id,
+	}
+
+	return vectorRecord, nil
+}
+
+// === Vector Store
+
+type MemoryVectorStore struct {
+	Records map[string]VectorRecord
+}
+
+func (mvs *MemoryVectorStore) Get(id string) (VectorRecord, error) {
+	return mvs.Records[id], nil
+}
+
+func (mvs *MemoryVectorStore) GetAll() ([]VectorRecord, error) {
+	var records []VectorRecord
+	for _, record := range mvs.Records {
+		records = append(records, record)
+	}
+	return records, nil
+}
+
+func (mvs *MemoryVectorStore) Save(vectorRecord VectorRecord) (VectorRecord, error) {
+	mvs.Records[vectorRecord.Id] = vectorRecord
+	return vectorRecord, nil
+}
+
+// SearchSimilarities searches for vector records in the MemoryVectorStore that have a cosine distance similarity greater than or equal to the given limit.
+//
+// Parameters:
+//   - embeddingFromQuestion: the vector record to compare similarities with.
+//   - limit: the minimum cosine distance similarity threshold.
+//
+// Returns:
+//   - []llm.VectorRecord: a slice of vector records that have a cosine distance similarity greater than or equal to the limit.
+//   - error: an error if any occurred during the search.
+func (mvs *MemoryVectorStore) SearchSimilarities(embeddingFromQuestion VectorRecord, limit float64) ([]VectorRecord, error) {
+	// search similarities
+	var records []VectorRecord
+
+	for _, v := range mvs.Records {
+		distance := CosineDistance(embeddingFromQuestion.Embedding, v.Embedding)
+		if distance >= limit {
+			records = append(records, v)
+		}
+	}
+
+	return records, nil
+}
+
+// === Chat Completion ===
 func Chat(url string, query Query) (Answer, error) {
 
 	query.Stream = false
@@ -90,7 +214,7 @@ func Chat(url string, query Query) (Answer, error) {
 }
 
 func ChatStream(url string, query Query, onChunk func(Answer) error) (Answer, error) {
-	
+
 	query.Stream = true
 
 	jsonQuery, err := json.Marshal(query)
@@ -102,7 +226,7 @@ func ChatStream(url string, query Query, onChunk func(Answer) error) (Answer, er
 	if err != nil {
 		return Answer{}, err
 	}
-	
+
 	reader := bufio.NewReader(resp.Body)
 
 	var fullAnswer Answer
