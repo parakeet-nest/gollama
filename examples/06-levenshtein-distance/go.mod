@@ -1,4 +1,4 @@
-module 03-create-embedding
+module 06-levenshtein-distance
 
 go 1.22.1
 

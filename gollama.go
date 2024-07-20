@@ -177,6 +177,70 @@ func (mvs *MemoryVectorStore) SearchSimilarities(embeddingFromQuestion VectorRec
 	return records, nil
 }
 
+// === Similarities ===
+
+// --- Jaccard index ---
+
+// check if an item is a part of a set
+func contains(set []string, element string) bool {
+    for _, s := range set {
+        if s == element {
+            return true
+        }
+    }
+    return false
+}
+
+// https://en.wikipedia.org/wiki/Jaccard_index
+func JaccardSimilarityCoeff(set1, set2 []string) float64 {
+    intersection := 0
+    union := len(set1) + len(set2) - intersection
+
+    for _, element := range set1 {
+        if contains(set2, element) {
+            intersection++
+        }
+    }
+
+    return float64(intersection) / float64(union)
+}
+
+// --- Levenshtein distance ---
+
+func min(a, b, c int) int {
+    if a <= b && a <= c {
+        return a
+    } else if b <= a && b <= c {
+        return b
+    } else {
+        return c
+    }
+}
+
+func LevenshteinDistance(str1, str2 string) int {
+    m := make([][]int, len(str1)+1)
+    for i := range m {
+        m[i] = make([]int, len(str2)+1)
+    }
+
+    for i := 0; i <= len(str1); i++ {
+        for j := 0; j <= len(str2); j++ {
+            if i == 0 {
+                m[i][j] = j
+            } else if j == 0 {
+                m[i][j] = i
+            } else if str1[i-1] == str2[j-1] {
+                m[i][j] = m[i-1][j-1]
+            } else {
+                m[i][j] = 1 + min(m[i-1][j], m[i][j-1], m[i-1][j-1])
+            }
+        }
+    }
+
+    return m[len(str1)][len(str2)]
+}
+
+
 // === Chat Completion ===
 func Chat(url string, query Query) (Answer, error) {
 

@@ -5,6 +5,8 @@ use(
     examples/01-chat
     examples/02-chat-stream
     examples/03-create-embedding
-    examples/04-similarity-search
+    examples/04-embeddings-similarity-search
+    examples/05-jaccard-index
+    examples/06-levenshtein-distance
 
 )
