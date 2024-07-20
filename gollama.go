@@ -54,6 +54,63 @@ type Query struct {
 	//Template  string `json:"template,omitempty"`
 }
 
+// === Embeddings ===
+type VectorRecord struct {
+	Id        string    `json:"id"`
+	Prompt    string    `json:"prompt"`
+	Embedding []float64 `json:"embedding"`
+}
+
+// https://github.com/ollama/ollama/blob/main/docs/api.md#request-22
+type Query4Embedding struct {
+	Prompt string `json:"prompt"`
+	Model  string `json:"model"`
+}
+
+type EmbeddingResponse struct {
+	Embedding []float64 `json:"embedding"`
+}
+
+
+// Create embedding
+func CreateEmbedding(ollamaUrl string, query Query4Embedding, id string) (VectorRecord, error) {
+	jsonData, err := json.Marshal(query)
+	if err != nil {
+		return VectorRecord{}, err
+	}
+
+	resp, err := http.Post(ollamaUrl+"/api/embeddings", "application/json; charset=utf-8", bytes.NewBuffer(jsonData))
+	if err != nil {
+		return VectorRecord{}, err
+	}
+	defer resp.Body.Close()
+
+
+	if resp.StatusCode != http.StatusOK {
+		return VectorRecord{}, errors.New("Error: status code: " + resp.Status)
+	}
+	body, err := io.ReadAll(resp.Body)
+	
+	if err != nil {
+		return VectorRecord{}, err
+	}
+
+	var answer EmbeddingResponse
+	err = json.Unmarshal([]byte(string(body)), &answer)
+	if err != nil {
+		return VectorRecord{}, err
+	}
+
+	vectorRecord := VectorRecord{
+		Prompt:    query.Prompt,
+		Embedding: answer.Embedding,
+		Id:        id,
+	}
+
+	return vectorRecord, nil
+}
+
+
 func Chat(url string, query Query) (Answer, error) {
 
 	query.Stream = false
