@@ -1,4 +1,4 @@
-module 05-jaccard-similarity-search
+module 06-levenshtein-distance
 
 go 1.22.1
 

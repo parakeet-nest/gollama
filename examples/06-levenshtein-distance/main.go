@@ -2,7 +2,6 @@ package main
 
 import (
 	"fmt"
-	"strings"
 
 	"github.com/parakeet-nest/gollama"
 )
@@ -33,18 +32,21 @@ var docs = []string{
 	making him the crew's unsung guardian in the cosmos. His best friend is Spiderman from the Marvel Cinematic Universe.`,
 }
 
+/*
+Not entirely interesting with this use case
+But If I use a keyword system, perhaps it could be better
+*/
+
 func main() {
 
 	userContent := `Who is Jean-Luc Picard?`
 
-	splittedUserContent := strings.Fields(userContent)
-
-	// Calculate Jaccard index for every document
-	// the highest index is related to the best similarity
+	// Calculate Levenshtein distance for every document
+	// the lowest distance is related to the best similarity
 	for idx, doc := range docs {
 
-		jaccardIndex := gollama.JaccardSimilarityCoeff(splittedUserContent, strings.Fields(doc))
-		fmt.Println("-", idx, "Jaccard index:", jaccardIndex)
+		levenshteinDistance := gollama.LevenshteinDistance(userContent, doc)
+		fmt.Println("-", idx, "Levenshtein distance:", levenshteinDistance)
 
 	}
 

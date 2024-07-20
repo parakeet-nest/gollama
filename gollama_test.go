@@ -157,7 +157,14 @@ func TestSimilaritySearch(t *testing.T) {
 
 }
 
-func TestJAccardSimilarity(t *testing.T) {
+/*
+Not entirely interesting with this use case
+But If I use a keyword system, perhaps it could be better
+=> add meta data at every document / or summary
+=> extract meta data / or summary
+=> retrieve the doc(s)
+*/
+func TestJaccardSimilarity(t *testing.T) {
 	userContent := `Who is Jean-Luc Picard?`
 
 	splittedUserContent := strings.Fields(userContent)
@@ -185,6 +192,50 @@ func TestJAccardSimilarity(t *testing.T) {
 		}
 
 	}
+	if len(similarities) == 0 {
+		t.Fatal("😡 no similarity:", errors.New("no similarity"))
+	} else {
+		log.Println("🙂 Similarities:", similarities)
+	}
+}
+
+/*
+Not entirely interesting with this use case
+But If I use a keyword system, perhaps it could be better
+=> add meta data at every document / or summary
+=> extract meta data / or summary
+=> retrieve the doc(s)
+*/
+func TestLevenshteinDistance(t *testing.T) {
+	userContent := `Who is Jean-Luc Picard?`
+
+	type similarity struct {
+		distance int
+		doc   string
+	}
+
+	similarities := []similarity{}
+
+
+
+	// Calculate Levenshtein distance for every document
+	// the lowest distance is related to the best similarity
+	for idx, doc := range docs {
+
+		levenshteinDistance := LevenshteinDistance(userContent, doc)
+		fmt.Println("-", idx, "Levenshtein distance:", levenshteinDistance)
+
+		similarity := similarity{
+			distance: levenshteinDistance,
+			doc:   docs[idx],
+		}
+
+		if levenshteinDistance < 300 {
+			similarities = append(similarities, similarity)
+		}
+
+	}
+
 	if len(similarities) == 0 {
 		t.Fatal("😡 no similarity:", errors.New("no similarity"))
 	} else {
