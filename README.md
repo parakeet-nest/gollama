@@ -9,3 +9,5 @@
 - Chat completion
 - Embedding
 - Similarity search
+- Jaccard Index
+- Levenshteinv Distance
