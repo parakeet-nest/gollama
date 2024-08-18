@@ -8,6 +8,8 @@ import (
 	"io"
 	"math"
 	"net/http"
+	"sort"
+
 )
 
 type Message struct {
@@ -53,6 +55,9 @@ type Query struct {
 	Raw       bool   `json:"raw,omitempty"`
 	//System    string `json:"system,omitempty"`
 	//Template  string `json:"template,omitempty"`
+
+	TokenHeaderName  string
+	TokenHeaderValue string
 }
 
 // === Cosine distance ===
@@ -82,12 +87,21 @@ type VectorRecord struct {
 	Id        string    `json:"id"`
 	Prompt    string    `json:"prompt"`
 	Embedding []float64 `json:"embedding"`
+
+	CosineDistance float64
+
+	Reference string `json:"reference"`
+	MetaData  string `json:"metaData"`
+	Text      string `json:"text"`
 }
 
 // https://github.com/ollama/ollama/blob/main/docs/api.md#request-22
 type Query4Embedding struct {
 	Prompt string `json:"prompt"`
 	Model  string `json:"model"`
+
+	TokenHeaderName  string
+	TokenHeaderValue string
 }
 
 type EmbeddingResponse struct {
@@ -101,12 +115,24 @@ func CreateEmbedding(ollamaUrl string, query Query4Embedding, id string) (Vector
 		return VectorRecord{}, err
 	}
 
-	resp, err := http.Post(ollamaUrl+"/api/embeddings", "application/json; charset=utf-8", bytes.NewBuffer(jsonData))
+	req, err := http.NewRequest(http.MethodPost, ollamaUrl+"/api/embeddings", bytes.NewBuffer(jsonData))
 	if err != nil {
 		return VectorRecord{}, err
 	}
-	defer resp.Body.Close()
+	req.Header.Set("Content-Type", "application/json; charset=utf-8")
 
+	if query.TokenHeaderName != "" && query.TokenHeaderValue != "" {
+		req.Header.Set(query.TokenHeaderName, query.TokenHeaderValue)
+	}
+
+	client := &http.Client{}
+	resp, err := client.Do(req)
+	if err != nil {
+		return VectorRecord{}, err
+	}
+
+	defer resp.Body.Close()
+	
 	if resp.StatusCode != http.StatusOK {
 		return VectorRecord{}, errors.New("Error: status code: " + resp.Status)
 	}
@@ -161,7 +187,7 @@ func (mvs *MemoryVectorStore) Save(vectorRecord VectorRecord) (VectorRecord, err
 //   - limit: the minimum cosine distance similarity threshold.
 //
 // Returns:
-//   - []llm.VectorRecord: a slice of vector records that have a cosine distance similarity greater than or equal to the limit.
+//   - VectorRecord: a slice of vector records that have a cosine distance similarity greater than or equal to the limit.
 //   - error: an error if any occurred during the search.
 func (mvs *MemoryVectorStore) SearchSimilarities(embeddingFromQuestion VectorRecord, limit float64) ([]VectorRecord, error) {
 	// search similarities
@@ -170,11 +196,38 @@ func (mvs *MemoryVectorStore) SearchSimilarities(embeddingFromQuestion VectorRec
 	for _, v := range mvs.Records {
 		distance := CosineDistance(embeddingFromQuestion.Embedding, v.Embedding)
 		if distance >= limit {
+			v.CosineDistance = distance
 			records = append(records, v)
 		}
 	}
 
 	return records, nil
+}
+
+// SearchTopNSimilarities searches for the top N similar vector records based on the given embedding from a question.
+// It returns a slice of vector records and an error if any.
+// The limit parameter specifies the minimum similarity score for a record to be considered similar.
+// The max parameter specifies the maximum number of vector records to return.
+func (mvs *MemoryVectorStore) SearchTopNSimilarities(embeddingFromQuestion VectorRecord, limit float64, max int) ([]VectorRecord, error) {
+	records, err := mvs.SearchSimilarities(embeddingFromQuestion, limit)
+	if err != nil {
+		return nil, err
+	}
+	return getTopNVectorRecords(records, max), nil
+}
+
+
+func getTopNVectorRecords(records []VectorRecord, max int) []VectorRecord {
+	// Sort the records slice in descending order based on CosineDistance
+	sort.Slice(records, func(i, j int) bool {
+		return records[i].CosineDistance > records[j].CosineDistance
+	})
+
+	// Return the first max records or all if less than three
+	if len(records) < max {
+		return records
+	}
+	return records[:max]
 }
 
 // === Similarities ===
@@ -183,63 +236,62 @@ func (mvs *MemoryVectorStore) SearchSimilarities(embeddingFromQuestion VectorRec
 
 // check if an item is a part of a set
 func contains(set []string, element string) bool {
-    for _, s := range set {
-        if s == element {
-            return true
-        }
-    }
-    return false
+	for _, s := range set {
+		if s == element {
+			return true
+		}
+	}
+	return false
 }
 
 // https://en.wikipedia.org/wiki/Jaccard_index
 func JaccardSimilarityCoeff(set1, set2 []string) float64 {
-    intersection := 0
-    union := len(set1) + len(set2) - intersection
+	intersection := 0
+	union := len(set1) + len(set2) - intersection
 
-    for _, element := range set1 {
-        if contains(set2, element) {
-            intersection++
-        }
-    }
+	for _, element := range set1 {
+		if contains(set2, element) {
+			intersection++
+		}
+	}
 
-    return float64(intersection) / float64(union)
+	return float64(intersection) / float64(union)
 }
 
 // --- Levenshtein distance ---
 
 func min(a, b, c int) int {
-    if a <= b && a <= c {
-        return a
-    } else if b <= a && b <= c {
-        return b
-    } else {
-        return c
-    }
+	if a <= b && a <= c {
+		return a
+	} else if b <= a && b <= c {
+		return b
+	} else {
+		return c
+	}
 }
 
 func LevenshteinDistance(str1, str2 string) int {
-    m := make([][]int, len(str1)+1)
-    for i := range m {
-        m[i] = make([]int, len(str2)+1)
-    }
+	m := make([][]int, len(str1)+1)
+	for i := range m {
+		m[i] = make([]int, len(str2)+1)
+	}
 
-    for i := 0; i <= len(str1); i++ {
-        for j := 0; j <= len(str2); j++ {
-            if i == 0 {
-                m[i][j] = j
-            } else if j == 0 {
-                m[i][j] = i
-            } else if str1[i-1] == str2[j-1] {
-                m[i][j] = m[i-1][j-1]
-            } else {
-                m[i][j] = 1 + min(m[i-1][j], m[i][j-1], m[i-1][j-1])
-            }
-        }
-    }
+	for i := 0; i <= len(str1); i++ {
+		for j := 0; j <= len(str2); j++ {
+			if i == 0 {
+				m[i][j] = j
+			} else if j == 0 {
+				m[i][j] = i
+			} else if str1[i-1] == str2[j-1] {
+				m[i][j] = m[i-1][j-1]
+			} else {
+				m[i][j] = 1 + min(m[i-1][j], m[i][j-1], m[i-1][j-1])
+			}
+		}
+	}
 
-    return m[len(str1)][len(str2)]
+	return m[len(str1)][len(str2)]
 }
-
 
 // === Chat Completion ===
 func Chat(url string, query Query) (Answer, error) {
@@ -251,11 +303,21 @@ func Chat(url string, query Query) (Answer, error) {
 		return Answer{}, err
 	}
 
-	resp, err := http.Post(url+"/api/chat", "application/json; charset=utf-8", bytes.NewBuffer(jsonQuery))
+	req, err := http.NewRequest(http.MethodPost, url+"/api/chat", bytes.NewBuffer(jsonQuery))
 	if err != nil {
 		return Answer{}, err
 	}
+	req.Header.Set("Content-Type", "application/json; charset=utf-8")
 
+	if query.TokenHeaderName != "" && query.TokenHeaderValue != "" {
+		req.Header.Set(query.TokenHeaderName, query.TokenHeaderValue)
+	}
+
+	client := &http.Client{}
+	resp, err := client.Do(req)
+	if err != nil {
+		return Answer{}, err
+	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
@@ -286,11 +348,22 @@ func ChatStream(url string, query Query, onChunk func(Answer) error) (Answer, er
 		return Answer{}, err
 	}
 
-	resp, err := http.Post(url+"/api/chat", "application/json; charset=utf-8", bytes.NewBuffer(jsonQuery))
+	req, err := http.NewRequest(http.MethodPost, url+"/api/chat", bytes.NewBuffer(jsonQuery))
 	if err != nil {
 		return Answer{}, err
 	}
+	req.Header.Set("Content-Type", "application/json; charset=utf-8")
 
+	if query.TokenHeaderName != "" && query.TokenHeaderValue != "" {
+		req.Header.Set(query.TokenHeaderName, query.TokenHeaderValue)
+	}
+
+	client := &http.Client{}
+	resp, err := client.Do(req)
+	if err != nil {
+		return Answer{}, err
+	}
+	defer resp.Body.Close()
 	reader := bufio.NewReader(resp.Body)
 
 	var fullAnswer Answer

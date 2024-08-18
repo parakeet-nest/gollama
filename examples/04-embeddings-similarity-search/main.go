@@ -83,8 +83,10 @@ func main() {
 
 	// decrease the limit with all-minilm:22m & 33m -> 0.4
 	// decrease the limit with qwen2:0.5b & 1.5b -> 0.6
-	similarities, err := store.SearchSimilarities(embeddingFromQuestion, 0.6)
+	
+	//similarities, err := store.SearchSimilarities(embeddingFromQuestion, 0.6)
 
+	similarities, err := store.SearchTopNSimilarities(embeddingFromQuestion, 0.3, 3)
 	/*
 	- put the limit to 0.5 
 	- and get only the last n results

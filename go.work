@@ -8,5 +8,8 @@ use(
     examples/04-embeddings-similarity-search
     examples/05-jaccard-index
     examples/06-levenshtein-distance
+    examples/07-chat-token
+    examples/08-chat-stream-token
+    examples/09-create-embedding-token
 
 )

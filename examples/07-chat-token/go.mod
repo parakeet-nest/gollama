@@ -1,4 +1,4 @@
-module 01-chat
+module 07-chat-token
 
 go 1.22.1
 

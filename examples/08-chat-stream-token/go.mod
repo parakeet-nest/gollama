@@ -1,4 +1,4 @@
-module 01-chat
+module 08-chat-stream-token
 
 go 1.22.1
 

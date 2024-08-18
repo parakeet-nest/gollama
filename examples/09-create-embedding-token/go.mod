@@ -1,4 +1,4 @@
-module 01-chat
+module 09-create-embedding-token
 
 go 1.22.1
 
