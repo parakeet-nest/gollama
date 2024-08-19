@@ -9,7 +9,6 @@ import (
 	"math"
 	"net/http"
 	"sort"
-
 )
 
 type Message struct {
@@ -132,7 +131,7 @@ func CreateEmbedding(ollamaUrl string, query Query4Embedding, id string) (Vector
 	}
 
 	defer resp.Body.Close()
-	
+
 	if resp.StatusCode != http.StatusOK {
 		return VectorRecord{}, errors.New("Error: status code: " + resp.Status)
 	}
@@ -215,7 +214,6 @@ func (mvs *MemoryVectorStore) SearchTopNSimilarities(embeddingFromQuestion Vecto
 	}
 	return getTopNVectorRecords(records, max), nil
 }
-
 
 func getTopNVectorRecords(records []VectorRecord, max int) []VectorRecord {
 	// Sort the records slice in descending order based on CosineDistance
@@ -375,7 +373,11 @@ func ChatStream(url string, query Query, onChunk func(Answer) error) (Answer, er
 			if err == io.EOF {
 				break
 			}
-			return Answer{}, err
+			// we need to create a new error because
+			// because, even if the status is not ok (ex 401 Unauthorized)
+			// the error == nil
+			//return Answer{}, errors.New("Error: status code: " + resp.Status)
+			return Answer{}, errors.New("Error: status code: " + resp.Status)
 		}
 
 		err = json.Unmarshal(line, &answer)
@@ -391,6 +393,11 @@ func ChatStream(url string, query Query, onChunk func(Answer) error) (Answer, er
 		}
 	}
 	fullAnswer.Message.Role = answer.Message.Role
-	return fullAnswer, nil
+	//return fullAnswer, nil
+	if resp.StatusCode != http.StatusOK {
+		return Answer{}, errors.New("Error: status code: " + resp.Status)
+	} else {
+		return fullAnswer, nil
+	}
 
 }
