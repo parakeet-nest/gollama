@@ -1,4 +1,4 @@
-module 06-levenshtein-distance
+module 10-chat-tools
 
 go 1.22.1
 

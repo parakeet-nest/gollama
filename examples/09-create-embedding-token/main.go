@@ -9,7 +9,7 @@ import (
 )
 
 func main() {
-	ollamaUrl := "https://ollamak33g.eu.loclx.io"
+	ollamaUrl := "https://ollama.wasm.ninja"
 	model := "all-minilm:33m"
 
 	content := `The best pizza of the world is the pineapple pizza`

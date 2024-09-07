@@ -9,17 +9,74 @@ import (
 	"math"
 	"net/http"
 	"sort"
+	"strings"
+	"text/template"
 )
 
-type Message struct {
-	Role    string `json:"role"`
-	Content string `json:"content"`
+type FunctionTool struct {
+	Name      string                 `json:"name"`
+	Arguments map[string]interface{} `json:"arguments"` // used for the ToolCalls list
 }
 
+func (ft *FunctionTool) ToJSONString() (string, error) {
+	// Marshal the data into JSON
+	jsonBytes, err := json.Marshal(ft)
+	if err != nil {
+		return "", err
+	}
+	// Convert JSON bytes to string
+	jsonString := string(jsonBytes)
+	return jsonString, nil
+}
+
+type Message struct {
+	Role      string `json:"role"`
+	Content   string `json:"content"`
+	ToolCalls []struct {
+		Function FunctionTool `json:"function"`
+	} `json:"tool_calls"`
+}
+
+func (m *Message) ToolCallsToJSONString() (string, error) {
+	// Marshal the data into JSON
+	jsonBytes, err := json.Marshal(m.ToolCalls)
+	if err != nil {
+		return "", err
+	}
+	// Convert JSON bytes to string
+	jsonString := string(jsonBytes)
+	return jsonString, nil
+}
+
+func (m *Message) FirstToolCallToJSONString() (string, error) {
+	// Marshal the data into JSON
+	jsonBytes, err := json.Marshal(m.ToolCalls[0])
+	if err != nil {
+		return "", err
+	}
+	// Convert JSON bytes to string
+	jsonString := string(jsonBytes)
+	return jsonString, nil
+}
+
+// Answer
 type Answer struct {
-	//Model   string  `json:"model"`
+	Model   string  `json:"model"`
 	Message Message `json:"message"`
 	Done    bool    `json:"done"`
+}
+
+func (answer *Answer) ToJsonString() string {
+	// for the verbose mode
+	// Marshal the answer into JSON
+	jsonBytes, err := json.MarshalIndent(answer, "", "  ")
+
+	if err != nil {
+		return `{"error":"` + err.Error() + `"}`
+	}
+	// Convert JSON bytes to string
+	jsonString := string(jsonBytes)
+	return jsonString
 }
 
 type Options struct {
@@ -43,20 +100,58 @@ type Options struct {
 	PenalizeNewline  bool    `json:"penalize_newline,omitempty"`
 }
 
+// Tools
+type Property struct {
+	Type        string `json:"type"`
+	Description string `json:"description"`
+}
+
+type Parameters struct {
+	Type       string              `json:"type"`
+	Properties map[string]Property `json:"properties"`
+	Required   []string            `json:"required"`
+}
+
+type Function struct {
+	Name        string     `json:"name"`
+	Description string     `json:"description"`
+	Parameters  Parameters `json:"parameters"`
+}
+
+type Tool struct {
+	Type     string   `json:"type"`
+	Function Function `json:"function"`
+}
+
+// Query
 type Query struct {
 	Model    string    `json:"model"`
-	Messages []Message `json:"messages"`
+	Messages []Message `json:"messages"` // For Chat Completion
 	Options  Options   `json:"options"`
 	Stream   bool      `json:"stream"`
+	Tools    []Tool    `json:"tools"`
 
-	Format    string `json:"format,omitempty"`
+	Format    string `json:"format,omitempty"` // https://github.com/ollama/ollama/blob/main/docs/api.md#request-json-mode
 	KeepAlive bool   `json:"keep_alive,omitempty"`
 	Raw       bool   `json:"raw,omitempty"`
-	//System    string `json:"system,omitempty"`
-	//Template  string `json:"template,omitempty"`
+	System    string `json:"system,omitempty"`
+	Template  string `json:"template,omitempty"`
 
 	TokenHeaderName  string
 	TokenHeaderValue string
+}
+
+func (query *Query) ToJsonString() string {
+	// for the verbose mode
+	// Marshal the answer into JSON
+	jsonBytes, err := json.MarshalIndent(query, "", "  ")
+
+	if err != nil {
+		return `{"error":"` + err.Error() + `"}`
+	}
+	// Convert JSON bytes to string
+	jsonString := string(jsonBytes)
+	return jsonString
 }
 
 // === Cosine distance ===
@@ -228,69 +323,6 @@ func getTopNVectorRecords(records []VectorRecord, max int) []VectorRecord {
 	return records[:max]
 }
 
-// === Similarities ===
-
-// --- Jaccard index ---
-
-// check if an item is a part of a set
-func contains(set []string, element string) bool {
-	for _, s := range set {
-		if s == element {
-			return true
-		}
-	}
-	return false
-}
-
-// https://en.wikipedia.org/wiki/Jaccard_index
-func JaccardSimilarityCoeff(set1, set2 []string) float64 {
-	intersection := 0
-	union := len(set1) + len(set2) - intersection
-
-	for _, element := range set1 {
-		if contains(set2, element) {
-			intersection++
-		}
-	}
-
-	return float64(intersection) / float64(union)
-}
-
-// --- Levenshtein distance ---
-
-func min(a, b, c int) int {
-	if a <= b && a <= c {
-		return a
-	} else if b <= a && b <= c {
-		return b
-	} else {
-		return c
-	}
-}
-
-func LevenshteinDistance(str1, str2 string) int {
-	m := make([][]int, len(str1)+1)
-	for i := range m {
-		m[i] = make([]int, len(str2)+1)
-	}
-
-	for i := 0; i <= len(str1); i++ {
-		for j := 0; j <= len(str2); j++ {
-			if i == 0 {
-				m[i][j] = j
-			} else if j == 0 {
-				m[i][j] = i
-			} else if str1[i-1] == str2[j-1] {
-				m[i][j] = m[i-1][j-1]
-			} else {
-				m[i][j] = 1 + min(m[i-1][j], m[i][j-1], m[i-1][j-1])
-			}
-		}
-	}
-
-	return m[len(str1)][len(str2)]
-}
-
 // === Chat Completion ===
 func Chat(url string, query Query) (Answer, error) {
 
@@ -400,4 +432,44 @@ func ChatStream(url string, query Query, onChunk func(Answer) error) (Answer, er
 		return fullAnswer, nil
 	}
 
+}
+
+// String Interpolation
+func process(t *template.Template, vars interface{}) (string, error) {
+	var tmplBytes bytes.Buffer
+
+	err := t.Execute(&tmplBytes, vars)
+	if err != nil {
+		return "", err
+	}
+	return tmplBytes.String(), nil
+}
+
+func InterpolateString(str string, vars interface{}) (string, error) {
+
+	tmpl, err := template.New("tmpl").Parse(str)
+
+	if err != nil {
+		return "", err
+	}
+	output, err := process(tmpl, vars)
+
+	if err != nil {
+		return "", err
+	}
+	return output, nil
+}
+
+// Splitter
+
+// SplitTextWithDelimiter splits the given text using the specified delimiter and returns a slice of strings.
+//
+// Parameters:
+//   - text: The text to be split.
+//   - delimiter: The delimiter used to split the text.
+//
+// Returns:
+//   - []string: A slice of strings containing the split parts of the text.
+func SplitTextWithDelimiter(text string, delimiter string) []string {
+	return strings.Split(text, delimiter)
 }

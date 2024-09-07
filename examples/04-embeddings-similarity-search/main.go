@@ -86,7 +86,7 @@ func main() {
 	
 	//similarities, err := store.SearchSimilarities(embeddingFromQuestion, 0.6)
 
-	similarities, err := store.SearchTopNSimilarities(embeddingFromQuestion, 0.3, 3)
+	similarities, err := store.SearchTopNSimilarities(embeddingFromQuestion, 0.5, 1)
 	/*
 	- put the limit to 0.5 
 	- and get only the last n results

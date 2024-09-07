@@ -9,7 +9,7 @@ import (
 )
 
 func main() {
-	ollamaUrl := "https://ollamak33g.eu.loclx.io"
+	ollamaUrl := "https://ollama.wasm.ninja"
 	// if working from a container
 	//ollamaUrl := "http://host.docker.internal:11434"
 	model := "deepseek-coder"
