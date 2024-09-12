@@ -1,8 +1,8 @@
 {
     "workbench.iconTheme": "material-icon-theme",
-    "workbench.colorTheme": "Catppuccin Macchiato",
-    "editor.fontSize": 15,
-    "terminal.integrated.fontSize": 15,
+    "workbench.colorTheme": "Idea intellij light theme",
+    "editor.fontSize": 19,
+    "terminal.integrated.fontSize": 19,
     "editor.insertSpaces": true,
     "editor.tabSize": 4,
     "editor.detectIndentation": true,
