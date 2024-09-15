@@ -7,7 +7,7 @@ Todo:
   - TAG
   - ABOUT
 
-Remark: delete tag: git tag -d v0.0.1
+Remark: delete tag: git tag -d v0.0.6
 COMMENT
 
 echo "Generating release: ${TAG} ${ABOUT}"
