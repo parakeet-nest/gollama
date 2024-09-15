@@ -6,6 +6,8 @@ import (
 	"os"
 
 	"github.com/parakeet-nest/gollama"
+	"github.com/parakeet-nest/gollama/enums/option"
+
 )
 
 func main() {
@@ -22,10 +24,10 @@ func main() {
 	Can you create a "hello world" program in Golang?
 	And, please, be structured with bullet points`
 
-	options := gollama.Options{
-		Temperature: 0.0, // default (0.8)
-		RepeatLastN: 2,   // default (64) the default value will "freeze" deepseek-coder
-	}
+	options := gollama.SetOptions(map[string]interface{}{
+		option.Temperature: 0.0,
+		option.RepeatLastN: 2,
+	})
 
 	query := gollama.Query{
 		Model: model,

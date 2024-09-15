@@ -5,6 +5,7 @@ import (
 	"log"
 
 	"github.com/parakeet-nest/gollama"
+	"github.com/parakeet-nest/gollama/enums/option"
 )
 
 func main() {
@@ -58,11 +59,13 @@ func main() {
 		{Role: "user", Content: `say "hello" to Bob`},
 	}
 
-	options := gollama.Options{
-		Temperature:   0.0,
-		RepeatLastN:   2,
-		RepeatPenalty: 2.0,
-	}
+
+	options := gollama.SetOptions(map[string]interface{}{
+		option.Temperature: 0.0,
+		option.RepeatLastN: 2,
+		option.RepeatPenalty: 2.0,
+	})
+
 
 	query := gollama.Query{
 		Model:    model,
